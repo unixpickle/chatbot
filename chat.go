@@ -2,6 +2,7 @@ package chatbot
 
 import (
 	"math"
+	"math/rand"
 
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/weakai/rnn"
@@ -43,7 +44,7 @@ func (c *Chat) Receive() (msg string, more bool) {
 
 	var msgData []byte
 	for {
-		_, byteIdx := lastOut.Max()
+		byteIdx := randomSelection(lastOut)
 		if byteIdx < CharCount {
 			msgData = append(msgData, byte(byteIdx))
 			lastOut = c.runner.StepTime(oneHotVector(byteIdx))
@@ -54,4 +55,15 @@ func (c *Chat) Receive() (msg string, more bool) {
 	}
 	msg = string(msgData)
 	return
+}
+
+func randomSelection(weightVec linalg.Vector) int {
+	num := rand.Float64()
+	for i, x := range weightVec {
+		num -= math.Exp(x)
+		if num < 0 {
+			return i
+		}
+	}
+	return len(weightVec) - 1
 }
