@@ -26,16 +26,18 @@ func NewChat(b *Bot) *Chat {
 // It returns true if the bot expects to receive another
 // message before replying.
 func (c *Chat) Send(m string) (more bool) {
-	c.runner.StepTime(oneHotVector(StartExternalMsg))
-	var lastOut linalg.Vector
-	for _, b := range []byte(m) {
-		lastOut = c.runner.StepTime(oneHotVector(int(b)))
-	}
-	return lastOut[StartBotMsg] < lastOut[StartExternalMsg]
+	return c.sendContents(StartExternalMsg, m)
 }
 
-// Receive receives a message from the bot.
-// The more argument specifies whether or not the bot
+// ReceiveMessage tells the bot that it sent a message.
+// It returns true if the bot expects to send another
+// message.
+func (c *Chat) ReceiveMessage(m string) (more bool) {
+	return c.sendContents(StartBotMsg, m)
+}
+
+// Receive generates a message from the bot.
+// The more return value indicates whether or not the bot
 // wishes to send another message after this one.
 func (c *Chat) Receive() (msg string, more bool) {
 	lastOut := c.runner.StepTime(oneHotVector(StartBotMsg))
@@ -55,6 +57,18 @@ func (c *Chat) Receive() (msg string, more bool) {
 	}
 	msg = string(msgData)
 	return
+}
+
+func (c *Chat) sendContents(start int, m string) (more bool) {
+	lastOut := c.runner.StepTime(oneHotVector(start))
+	for _, b := range []byte(m) {
+		lastOut = c.runner.StepTime(oneHotVector(int(b)))
+	}
+	if start == StartExternalMsg {
+		return lastOut[StartBotMsg] < lastOut[StartExternalMsg]
+	} else {
+		return lastOut[StartBotMsg] > lastOut[StartExternalMsg]
+	}
 }
 
 func randomSelection(weightVec linalg.Vector) int {
