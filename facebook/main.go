@@ -50,7 +50,12 @@ func main() {
 
 func messageLoop(sess *fbmsgr.Session, bot *chatbot.Bot) {
 	chats := map[string]chan<- fbmsgr.Event{}
-	for event := range sess.Events() {
+	for {
+		event, err := sess.ReadEvent()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error reading event:", err)
+			os.Exit(1)
+		}
 		var threadID string
 		var group bool
 		switch event := event.(type) {
@@ -84,8 +89,6 @@ func messageLoop(sess *fbmsgr.Session, bot *chatbot.Bot) {
 			ch <- event
 		}
 	}
-	fmt.Fprintln(os.Stderr, "Events done with error:", sess.EventsError())
-	os.Exit(1)
 }
 
 func handleThread(thread string, group bool, events <-chan fbmsgr.Event, sess *fbmsgr.Session,
