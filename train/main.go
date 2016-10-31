@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/unixpickle/chatbot"
 	"github.com/unixpickle/sgd"
@@ -14,11 +16,13 @@ import (
 
 const (
 	MaxBufferChars = 400
-	StepSize       = 0.001
-	BatchSize      = 16
+	StepSize       = 0.005
+	BatchSize      = 4
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
+
 	if len(os.Args) != 3 {
 		fmt.Fprintln(os.Stderr, "Usage: train <samples> <output>")
 		os.Exit(1)
@@ -59,19 +63,21 @@ func main() {
 	var iteration int
 	var lastBatch sgd.SampleSet
 	sgd.SGDMini(gradienter, training, StepSize, BatchSize, func(s sgd.SampleSet) bool {
-		var lastCost float64
-		if lastBatch != nil {
-			lastCost = seqtoseq.TotalCostBlock(bot.Block, BatchSize, lastBatch, costFunc)
+		if iteration%4 == 0 {
+			var lastCost float64
+			if lastBatch != nil {
+				lastCost = seqtoseq.TotalCostBlock(bot.Block, BatchSize, lastBatch, costFunc)
+			}
+			lastBatch = s.Copy()
+			newCost := seqtoseq.TotalCostBlock(bot.Block, BatchSize, s, costFunc)
+
+			sgd.ShuffleSampleSet(validation)
+			validationCost := seqtoseq.TotalCostBlock(bot.Block, BatchSize,
+				validation.Subset(0, BatchSize), costFunc)
+
+			log.Printf("iter %d: validation=%f cost=%f last=%f", iteration, validationCost,
+				newCost, lastCost)
 		}
-		lastBatch = s.Copy()
-		newCost := seqtoseq.TotalCostBlock(bot.Block, BatchSize, s, costFunc)
-
-		sgd.ShuffleSampleSet(validation)
-		validationCost := seqtoseq.TotalCostBlock(bot.Block, BatchSize,
-			validation.Subset(0, BatchSize), costFunc)
-
-		log.Printf("iter %d: validation=%f cost=%f last=%f", iteration, validationCost,
-			newCost, lastCost)
 
 		iteration++
 		return true
