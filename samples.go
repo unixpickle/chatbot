@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -73,6 +74,20 @@ func NewSampleSet(path string, maxBuffer int) (*SampleSet, error) {
 		convos = [][]message{convo}
 	}
 
+	return newSampleSetConvos(convos, maxBuffer)
+}
+
+// NewSampleSetReader loads a sample set by reading the
+// contents of one sample data file.
+func NewSampleSetReader(in io.Reader, maxBuffer int) (*SampleSet, error) {
+	convo, err := readConversation(in)
+	if err != nil {
+		return nil, err
+	}
+	return newSampleSetConvos([][]message{convo}, maxBuffer)
+}
+
+func newSampleSetConvos(convos [][]message, maxBuffer int) (*SampleSet, error) {
 	res := &SampleSet{}
 	for _, convo := range convos {
 		for i := range convo {
@@ -175,6 +190,10 @@ func readConversationFile(file string) ([]message, error) {
 		return nil, err
 	}
 	defer f.Close()
+	return readConversation(f)
+}
+
+func readConversation(f io.Reader) ([]message, error) {
 	r := csv.NewReader(f)
 
 	records, err := r.ReadAll()
