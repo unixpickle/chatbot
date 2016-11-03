@@ -16,6 +16,7 @@ type Chat struct {
 
 // NewChat creates a new chat with an empty history.
 func NewChat(b *Bot) *Chat {
+	b.Dropout(false)
 	return &Chat{
 		runner: &rnn.Runner{Block: b.Block},
 	}

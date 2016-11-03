@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/unixpickle/neuralstruct"
 	"github.com/unixpickle/num-analysis/linalg"
 	"github.com/unixpickle/serializer"
 	"github.com/unixpickle/weakai/neuralnet"
@@ -17,6 +18,8 @@ const (
 
 	StartExternalMsg = CharCount
 	StartBotMsg      = CharCount + 1
+
+	HiddenDropout = 0.5
 )
 
 // A Bot manages a recurrent neural network that acts as a
@@ -27,25 +30,56 @@ type Bot struct {
 
 // NewBot creates a new, untrained Bot.
 func NewBot() *Bot {
+	structure := neuralstruct.RAggregate{
+		&neuralstruct.Stack{
+			VectorSize: 10,
+			NoReplace:  true,
+		},
+		&neuralstruct.Stack{
+			VectorSize: 10,
+			NoReplace:  true,
+		},
+	}
+
 	stateSizes := []int{400, 300, 200}
 	outNetwork := neuralnet.Network{
 		&neuralnet.DenseLayer{
 			InputCount:  stateSizes[len(stateSizes)-1],
-			OutputCount: InputCount,
+			OutputCount: structure.ControlSize() + InputCount,
 		},
-		&neuralnet.LogSoftmaxLayer{},
+		&neuralstruct.PartialActivation{
+			Ranges: []neuralstruct.ComponentRange{
+				{Start: 0, End: structure.DataSize()},
+				{Start: structure.ControlSize(), End: structure.ControlSize() + InputCount},
+			},
+			Activations: []neuralnet.Layer{
+				&neuralnet.Sigmoid{},
+				&neuralnet.LogSoftmaxLayer{},
+			},
+		},
 	}
 	outNetwork.Randomize()
 	outBlock := rnn.NewNetworkBlock(outNetwork, 0)
 
 	var fullNet rnn.StackedBlock
-	inSize := InputCount
+	inSize := InputCount + structure.DataSize()
 	for _, outSize := range stateSizes {
 		fullNet = append(fullNet, rnn.NewLSTM(inSize, outSize))
+		fullNet = append(fullNet, rnn.NewNetworkBlock(neuralnet.Network{
+			&neuralnet.DropoutLayer{
+				KeepProbability: HiddenDropout,
+				Training:        false,
+			},
+		}, 0))
 		inSize = outSize
 	}
 	fullNet = append(fullNet, outBlock)
-	return &Bot{Block: fullNet}
+	return &Bot{
+		Block: &neuralstruct.Block{
+			Block:  fullNet,
+			Struct: structure,
+		},
+	}
 }
 
 // LoadBot reads a Bot from a file.
@@ -71,6 +105,25 @@ func (b *Bot) Save(path string) error {
 		return err
 	}
 	return ioutil.WriteFile(path, encoded, 0755)
+}
+
+// Dropout enables or disables dropout in the network.
+func (b *Bot) Dropout(on bool) {
+	structBlock, ok := b.Block.(*neuralstruct.Block)
+	if !ok {
+		return
+	}
+	sb := structBlock.Block.(rnn.StackedBlock)
+	for _, x := range sb {
+		if n, ok := x.(*rnn.NetworkBlock); ok {
+			net := n.Network()
+			if len(net) == 1 {
+				if do, ok := net[0].(*neuralnet.DropoutLayer); ok {
+					do.Training = on
+				}
+			}
+		}
+	}
 }
 
 func oneHotVector(i int) linalg.Vector {

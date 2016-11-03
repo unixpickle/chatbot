@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	MaxBufferChars = 100
+	MaxBufferChars = 600
 	BatchSize      = 4
 	SyncInterval   = 4
 )
@@ -39,6 +39,7 @@ func Train(paramServer, sampleFile string) {
 	if err != nil {
 		die(err)
 	}
+	bot.Dropout(true)
 
 	client := &asyncsgd.ParamClient{
 		BaseURL: u,
@@ -56,6 +57,8 @@ func Train(paramServer, sampleFile string) {
 	slave.Sync()
 	err = slave.Loop(SyncInterval, func(next, last sgd.SampleSet) {
 		if iteration%4 == 0 {
+			bot.Dropout(false)
+			defer bot.Dropout(true)
 			var lastCost float64
 			if last != nil {
 				lastCost = seqtoseq.TotalCostBlock(bot.Block, BatchSize, last, costFunc)

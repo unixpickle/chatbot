@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	MaxBufferChars = 400
+	MaxBufferChars = 600
 	StepSize       = 0.005
 	BatchSize      = 4
 )
@@ -45,6 +45,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Failed to load bot:", err)
 		os.Exit(1)
 	}
+	bot.Dropout(true)
 
 	log.Println("Partitioning", samples.Len(), "samples...")
 	training, validation := sgd.HashSplit(samples, 0.9)
@@ -64,6 +65,8 @@ func main() {
 	var lastBatch sgd.SampleSet
 	sgd.SGDMini(gradienter, training, StepSize, BatchSize, func(s sgd.SampleSet) bool {
 		if iteration%4 == 0 {
+			bot.Dropout(false)
+			defer bot.Dropout(true)
 			var lastCost float64
 			if lastBatch != nil {
 				lastCost = seqtoseq.TotalCostBlock(bot.Block, BatchSize, lastBatch, costFunc)
