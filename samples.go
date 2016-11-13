@@ -158,6 +158,11 @@ func (s *SampleSet) Subset(start, end int) sgd.SampleSet {
 	}
 }
 
+// Hash returns a hash of the given sample.
+func (s *SampleSet) Hash(i int) []byte {
+	return s.GetSample(i).(seqtoseq.Sample).Hash()
+}
+
 func generateSnippet(maxChars int, msgs []message, msgIdx int) *snippet {
 	var count int
 	for i := msgIdx; i >= 0; i-- {
